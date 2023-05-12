@@ -31,10 +31,50 @@ void clear(GPUMemory&mem,ClearCommand cmd){
   }
 }
 
-
-void runVertexAssembly(InVertex inVertex,VertexArray vao){
-  
-}
+InVertex runVertexAssembly(InVertex inVertex,VertexArray vao, GPUMemory mem){
+  for (int i = 0; i < sizeof(vao.vertexAttrib); ++i){
+    switch (vao.vertexAttrib[i].type){
+      case AttributeType::FLOAT:
+      {
+        inVertex.attributes[i].v1 = ((float*)mem.buffers[vao.vertexAttrib[i].bufferID].data)[vao.vertexAttrib[i].offset/4 + vao.vertexAttrib[i].stride/4  * inVertex.gl_VertexID];
+        return inVertex;
+        break;
+      }
+      //FIXME: unsure about /4
+      case AttributeType::VEC2:
+        {
+          inVertex.attributes[i].v2 = ((glm::vec2*)mem.buffers[vao.vertexAttrib[i].bufferID].data + vao.vertexAttrib->offset)[vao.vertexAttrib->stride/4  * inVertex.gl_VertexID];
+        return inVertex;
+        break;
+      }
+      //TODO:
+      case AttributeType::VEC3:
+      printf ("test offset %ld\n", vao.vertexAttrib[i].offset);
+        inVertex.attributes[i].v3 = (glm::vec3) 0;//((glm::vec3*)(uint8_t*)mem.buffers[vao.vertexAttrib[i].bufferID].data)[vao.vertexAttrib[i].offset + vao.vertexAttrib[i].stride  * inVertex.gl_VertexID];
+        return inVertex;
+        break;
+      case AttributeType::VEC4:
+        inVertex.attributes[i].v4 = (glm::vec4) 0;
+        break;
+      case AttributeType::UINT:
+        inVertex.attributes[i].u1 = ((uint32_t *)((uint8_t*)mem.buffers[vao.indexBufferID].data+vao.indexOffset))[inVertex.gl_VertexID + vao.vertexAttrib->stride];
+        break;
+      case AttributeType::UVEC2:
+        inVertex.attributes[i].u2 = (glm::vec2)0;
+        break;
+      case AttributeType::UVEC3:
+        inVertex.attributes[i].u3 = (glm::vec3)0;
+        break;
+      case AttributeType::UVEC4:
+        inVertex.attributes[i].u4 = (glm::vec4) 0;
+        break;
+      default:
+        break;
+    }
+    //printf ("test %f\n", ((float*)vertAttribBuffer.data)[vao.vertexAttrib->offset + vao.vertexAttrib->stride*1]);
+  }
+  return inVertex;
+  }    
 
 uint32_t computeVertexID(GPUMemory&mem,VertexArray const&vao,uint32_t shaderInvocation){
     if(vao.indexBufferID<0){return shaderInvocation;}
@@ -67,7 +107,8 @@ void draw(GPUMemory&mem,DrawCommand cmd, int drawId){
     for(int i = 0; i < cmd.nofVertices; ++i){
       ShaderInterface si;
       inVertex.gl_VertexID = computeVertexID(mem, cmd.vao, i);
-      runVertexAssembly(inVertex, cmd.vao);
+       printf ("test offset cycle %ld\n", cmd.vao.vertexAttrib->offset);
+      inVertex = runVertexAssembly(inVertex, cmd.vao, mem);
       prg.vertexShader(outVertex,inVertex,si);
     }
 }
