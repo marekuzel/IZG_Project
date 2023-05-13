@@ -7,8 +7,9 @@
 
 #include <student/gpu.hpp>
 #include <stdio.h>
+
+
 void clear(GPUMemory&mem,ClearCommand cmd){
-  
   auto & frame = mem.framebuffer;
     auto nOfPixels = frame.height*frame.width;
     for (int i = 0; i < nOfPixels; ++i){
@@ -31,7 +32,31 @@ void clear(GPUMemory&mem,ClearCommand cmd){
   }
 }
 
-InVertex runVertexAssembly(InVertex inVertex,VertexArray vao, GPUMemory mem){
+
+uint32_t computeVertexID(GPUMemory&mem,VertexArray const&vao,uint32_t shaderInvocation){
+    if(vao.indexBufferID<0){return shaderInvocation;}
+
+    Buffer indexBuffer = mem.buffers[vao.indexBufferID];
+    if(vao.indexType == IndexType::UINT32){
+      uint32_t*ind = ((uint32_t*)((uint64_t)indexBuffer.data)+ vao.indexOffset);
+      return ind[shaderInvocation];
+      
+    }
+    else if (vao.indexType == IndexType::UINT8){
+      uint8_t*ind = ((uint8_t*)((uint64_t)indexBuffer.data + vao.indexOffset));
+      return (uint32_t)ind[shaderInvocation];
+      
+  }
+    else if (vao.indexType == IndexType::UINT16){
+      uint16_t*ind = (uint16_t*)((uint64_t)indexBuffer.data + vao.indexOffset);
+      return (uint32_t)ind[shaderInvocation];
+      
+  }
+  return shaderInvocation; //this line shouldnt be reached
+}
+
+InVertex runVertexAssembly(InVertex inVertex,VertexArray vao, GPUMemory mem, uint32_t shaderInvocation){
+  inVertex.gl_VertexID = computeVertexID(mem, vao, shaderInvocation);
   for (int i = 0; i < maxAttributes; ++i){
     auto bufferID = vao.vertexAttrib[i].bufferID;
     uint8_t*  ind = ((uint8_t*)mem.buffers[bufferID].data) + (uint8_t)(vao.vertexAttrib[i].offset + vao.vertexAttrib[i].stride*inVertex.gl_VertexID);
@@ -84,41 +109,24 @@ InVertex runVertexAssembly(InVertex inVertex,VertexArray vao, GPUMemory mem){
   return inVertex;
   }    
 
-uint32_t computeVertexID(GPUMemory&mem,VertexArray const&vao,uint32_t shaderInvocation){
-    if(vao.indexBufferID<0){return shaderInvocation;}
 
-    Buffer indexBuffer = mem.buffers[vao.indexBufferID];
-    if(vao.indexType == IndexType::UINT32){
-      uint32_t*ind = ((uint32_t*)((uint64_t)indexBuffer.data)+ vao.indexOffset);
-      return ind[shaderInvocation];
-      
-    }
-    else if (vao.indexType == IndexType::UINT8){
-      uint8_t*ind = ((uint8_t*)((uint64_t)indexBuffer.data + vao.indexOffset));
-      return (uint32_t)ind[shaderInvocation];
-      
+void runPrimitiveAssembly(GPUMemory&mem,DrawCommand cmd, uint32_t drawId, int j, Program prg){
+  for(int i = 0; i < 3; ++i){
+    InVertex inVertex;
+    inVertex.gl_DrawID = drawId;
+    OutVertex outVertex;
+    ShaderInterface si;
+    inVertex = runVertexAssembly(inVertex, cmd.vao, mem, i + j*3);
+    prg.vertexShader(outVertex,inVertex,si);
   }
-    else if (vao.indexType == IndexType::UINT16){
-      uint16_t*ind = (uint16_t*)((uint64_t)indexBuffer.data + vao.indexOffset);
-      return (uint32_t)ind[shaderInvocation];
-      
-  }
-  return shaderInvocation; //this line shouldnt be reached
 }
 
 void draw(GPUMemory&mem,DrawCommand cmd, int drawId){
-  Program prg = mem.programs[cmd.programID];
-
-  InVertex inVertex;
-  inVertex.gl_DrawID = drawId;
-  OutVertex outVertex;
-    for(int i = 0; i < cmd.nofVertices; ++i){
-      ShaderInterface si;
-      inVertex.gl_VertexID = computeVertexID(mem, cmd.vao, i);
-      inVertex = runVertexAssembly(inVertex, cmd.vao, mem);
-      prg.vertexShader(outVertex,inVertex,si);
-      
-    }
+  Program prg = mem.programs[cmd.programID]; 
+  printf ("nofVertices: %d\n", cmd.nofVertices);
+  for(int i = 0; i < cmd.nofVertices/3; ++i){
+    runPrimitiveAssembly(mem, cmd, drawId, i, prg);
+  }  
 }
 
 
