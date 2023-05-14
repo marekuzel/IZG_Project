@@ -6,7 +6,6 @@
  */
 
 #include <student/gpu.hpp>
-#include <stdio.h>
 
 
 void clear(GPUMemory&mem,ClearCommand cmd){
@@ -123,7 +122,6 @@ void runPrimitiveAssembly(GPUMemory&mem,DrawCommand cmd, uint32_t drawId, int j,
 
 void draw(GPUMemory&mem,DrawCommand cmd, int drawId){
   Program prg = mem.programs[cmd.programID]; 
-  printf ("nofVertices: %d\n", cmd.nofVertices);
   for(int i = 0; i < cmd.nofVertices/3; ++i){
     runPrimitiveAssembly(mem, cmd, drawId, i, prg);
   }  
